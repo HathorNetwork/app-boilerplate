@@ -94,8 +94,8 @@ def test_qa_sign_tx_with_authority(cmd):
             TxOutput(fake.pyint(1), fake_script()),
             ]
     tx = Transaction(0, 1, [token.uid], inputs, outputs)
-    print("QA::sign_tx_with_aauthority::token:", str(token))
-    print("QA::sign_tx_with_aauthority::tx:", str(tx))
+    print("QA::sign_tx_with_authority::token:", str(token))
+    print("QA::sign_tx_with_authority::tx:", str(tx))
     sig = cmd.sign_token_data(token)
     # send_token_data
     cmd.send_token_data(token, sig)
