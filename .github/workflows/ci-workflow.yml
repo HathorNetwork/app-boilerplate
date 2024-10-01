@@ -1,14 +1,19 @@
+---
+
 name: Compilation & tests
 
 on:
   push:
-    branches: [ "master", "dev" ]
+    branches: ["master", "dev", "main", "develop"]
   pull_request:
-    branches: [ "master", "dev" ]
+    branches: ["master", "dev", "main", "develop"]
 
 jobs:
   job_build_debug:
     name: Build debug
+    strategy:
+      matrix:
+        device: [nanos, nanox, nanosp]
     runs-on: ubuntu-latest
 
     container:
@@ -16,17 +21,25 @@ jobs:
 
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Build
         run: |
-          make DEBUG=1
+          echo "Building for ${{ matrix.device }}..." && \
+          eval "BOLOS_SDK=\$$(echo ${{ matrix.device }} | tr [:lower:] [:upper:])_SDK" && \
+          echo "BOLOS_SDK value will be ${BOLOS_SDK}" && \
+          make BOLOS_SDK=${BOLOS_SDK} DEBUG=1
+
+      - name: Prepare upload
+        run: |
+          find build/ -mindepth 2 -maxdepth 2 -type d ! -name 'bin' -exec rm -r {} +
 
       - name: Upload app binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
-          name: hathor-app-debug
-          path: bin
+          name: hathor-app-debug-${{ matrix.device }}
+          path: build/
+          if-no-files-found: error
 
   job_unit_test:
     name: Unit test
@@ -38,26 +51,26 @@ jobs:
 
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Build unit tests
-        run: |
+        run:
           cd unit-tests/
           bash run_tests.sh
-
-      - name: Generate code coverage
-        run: |
-          cd unit-tests/
-          bash gen_coverage.sh
-
-      - uses: actions/upload-artifact@v2
-        with:
-          name: code-coverage
-          path: unit-tests/coverage
 
   job_test:
     name: Test
     needs: job_build_debug
+    strategy:
+      matrix:
+        device: [nanos, nanox, nanosp]
+        include:
+          - device: nanos
+            build_dir: nanos
+          - device: nanosp
+            build_dir: nanos2
+          - device: nanox
+            build_dir: nanox
     runs-on: ubuntu-latest
 
     container:
@@ -74,13 +87,13 @@ jobs:
 
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Download app binary
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
-          name: hathor-app-debug
-          path: bin
+          name: hathor-app-debug-${{ matrix.device }}
+          path: build
 
       - name: Install Poetry
         run: |
@@ -89,7 +102,7 @@ jobs:
 
       - name: Run test
         run: |
-          nohup bash -c "python /speculos/speculos.py bin/app.elf --sdk 2.0 --display headless" > speculos.log 2<&1 &
+          nohup bash -c "python /speculos/speculos.py build/${{ matrix.build_dir }}/bin/app.elf --model ${{ matrix.device }} --display headless" > speculos.log 2<&1 &
           cd tests && make install && make test
 
       - name: Show speculos log
@@ -99,8 +112,7 @@ jobs:
 
       - name: Upload Speculos log
         if: success() || failure()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
-          name: speculos-log
+          name: ${{ matrix.device }}-speculos-log.log
           path: speculos.log
-
