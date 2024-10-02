@@ -291,6 +291,8 @@ bool skip_change_outputs() {
 
 /**
  * Prepare the UX screen values of the current output to confirm
+ * Returns true if we have no more outputs on buffer to show.
+ * Returns false if the next output is ready to be shown to the user for confirmation.
  */
 bool prepare_display_output() {
     // Check we have confirmed all outputs before attempting to display
