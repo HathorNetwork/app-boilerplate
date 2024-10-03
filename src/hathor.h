@@ -66,11 +66,11 @@ int address_from_pubkey(cx_ecfp_public_key_t *public_key, uint8_t *out, size_t o
  *   Script hash160
  *   An array of at least 20 bytes (uint8_t).
  * @param[in]  script_hash_len
- *   Lenght of script_hash buffer
+ *   Length of script_hash buffer
  * @param[out] out
  *   Pointer to output byte buffer for address.
  * @param[in]  outlen
- *   Lenght of output byte buffer.
+ *   Length of output byte buffer.
  * @return 0 on success
  *
  */
