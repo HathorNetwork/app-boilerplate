@@ -1,4 +1,5 @@
 import struct
+import time
 from typing import List, Tuple
 
 from app_client.cmd_builder import CommandBuilder, InsType
@@ -125,6 +126,8 @@ class Command:
 
             if sw != 0x9000:
                 raise DeviceException(error_code=sw, ins=InsType.INS_SIGN_TX)
+
+        time.sleep(0.1)
 
         index = 0
         # ask for signatures
