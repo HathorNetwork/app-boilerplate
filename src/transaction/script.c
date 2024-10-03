@@ -99,7 +99,7 @@ bool identify_p2sh_script(buffer_t *in, uint16_t script_len) {
     offset += 2 + PUBKEY_HASH_LEN;
 
     // check OP_EQUAL
-    if (in->ptr[in->offset + offset] != OP_EQUAL) {
+    if (in->ptr[in->offset + offset] != p2sh[2]) {
         PRINTF("[-] [Identify P2SH script] invalid script: ending opcode mismatch\n");
         return false;
     }
