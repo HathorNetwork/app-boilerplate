@@ -231,7 +231,7 @@ bool check_output_index_state() {
 }
 
 void inplace_selection_sort(size_t len, uint8_t* list) {
-    size_t i, j, position;
+    size_t i = 0, j = 0, position = 0;
     uint8_t tmp;
     for (i = 0; i < (len - 1); i++) {
         position = i;
@@ -252,7 +252,7 @@ bool skip_change_outputs() {
         return false;
     }
     // confirmed outputs holds the true current output index
-    uint8_t change_indices[1 + TX_MAX_TOKENS];
+    uint8_t change_indices[1 + TX_MAX_TOKENS] = {0};
     for (uint8_t i = 0; i < G_context.tx_info.change_len; i++) {
         change_indices[i] = G_context.tx_info.change_info[i].index;
     }
@@ -333,15 +333,15 @@ bool prepare_display_output() {
 
     // token_index == 0 means HTR, else use token_index-1 as index on the tokens array
     if (token_index == 0) {
-        strcpy(symbol, "HTR");
+        strlcpy(symbol, "HTR", 4);
         symbol_len = 3;
     } else {
         // custom token
         token_symbol_t* token = G_context.tx_info.tokens[token_index - 1];
-        strcpy(symbol, token->symbol);
+        strlcpy(symbol, token->symbol, MAX_TOKEN_SYMBOL_LEN + 1);
         symbol_len = strlen(token->symbol);
     }
-    strcpy(g_amount, symbol);
+    strlcpy(g_amount, symbol, MAX_TOKEN_SYMBOL_LEN + 1);
     g_amount[symbol_len] = ' ';
     format_value(output.value, g_amount + symbol_len + 1);
     return false;
