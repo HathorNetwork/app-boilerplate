@@ -13,12 +13,15 @@
 #include "../hathor.h"
 #include "../storage.h"
 #include "../sw.h"
+#include "../transaction/deserialize.h"
 #include "action/validate.h"
 #include "display.h"
 #include "menu.h"
 
 static action_validate_cb g_validate_callback;
 static char g_amount[30];
+static char g_authority[30];
+static bool g_is_authority;
 static char g_output_index[10];
 static char g_address[B58_ADDRESS_LEN];
 static char g_token_symbol[MAX_TOKEN_SYMBOL_LEN + 1];
@@ -59,6 +62,13 @@ UX_STEP_NOCB(ux_display_address_step,
              {
                  .title = "Address",
                  .text = g_address,
+             });
+// Step with title/text for authority
+UX_STEP_NOCB(ux_display_authority_step,
+             bnnn_paging,
+             {
+                 .title = "Authority",
+                 .text = g_authority,
              });
 // Step with title/text for amount
 UX_STEP_NOCB(ux_display_amount_step,
@@ -200,6 +210,15 @@ int ui_display_tx_confirm() {
     return 0;
 }
 
+// SIGN_TX: confirm authority output
+UX_FLOW(ux_display_tx_authority_output_flow,
+        &ux_display_review_output_step,  // Output <curr>/<total>
+        &ux_display_address_step,        // address
+        &ux_display_authority_step,      // Mint authority or Melt authority
+        &ux_display_approve_step,        // accept => decode next component and redisplay if needed
+        &ux_display_reject_step,         // reject => return error
+        FLOW_LOOP);
+
 // SIGN_TX: confirm output
 UX_FLOW(ux_display_tx_output_flow,
         &ux_display_review_output_step,  // Output <curr>/<total>
@@ -276,6 +295,8 @@ bool skip_change_outputs() {
 
 /**
  * Prepare the UX screen values of the current output to confirm
+ * Returns true if we have no more outputs on buffer to show.
+ * Returns false if the next output is ready to be shown to the user for confirmation.
  */
 bool prepare_display_output() {
     // Check we have confirmed all outputs before attempting to display
@@ -314,8 +335,11 @@ bool prepare_display_output() {
     base58_encode(address, ADDRESS_LEN, b58address, B58_ADDRESS_LEN);
     memmove(g_address, b58address, B58_ADDRESS_LEN);
 
-    // set g_ammount (HTR value)
+    // Clean amount and authority
     memset(g_amount, 0, sizeof(g_amount));
+    memset(g_authority, 0, sizeof(g_authority));
+
+    // Get token symbol
     int8_t token_index = output.token_data & TOKEN_DATA_INDEX_MASK;
     char symbol[MAX_TOKEN_SYMBOL_LEN + 1];
     uint8_t symbol_len;
@@ -330,9 +354,34 @@ bool prepare_display_output() {
         strlcpy(symbol, token->symbol, MAX_TOKEN_SYMBOL_LEN + 1);
         symbol_len = strlen(token->symbol);
     }
-    strlcpy(g_amount, symbol, MAX_TOKEN_SYMBOL_LEN + 1);
-    g_amount[symbol_len] = ' ';
-    format_value(output.value, g_amount + symbol_len + 1);
+
+    if (is_authority_output(output.token_data)) {
+        g_is_authority = true;
+        // set g_authority
+        strlcpy(g_authority, symbol, MAX_TOKEN_SYMBOL_LEN + 1);
+        g_authority[symbol_len] = ' ';
+        if (is_mint_authority(output.token_data, output.value)) {
+            strlcpy(g_authority + symbol_len + 1, "Mint", 30);
+        } else {
+            if (is_melt_authority(output.token_data, output.value)) {
+                strlcpy(g_authority + symbol_len + 1, "Melt", 30);
+            } else {
+                // This authority is unknown, so we treat it as invalid
+                PRINTF("[-] Unknown authority received in value %d\n", output.value);
+                explicit_bzero(&G_context, sizeof(G_context));
+                io_send_sw(SW_INVALID_TX);
+                ui_menu_main();
+                return true;
+            }
+        }
+    } else {
+        g_is_authority = false;
+        // set g_ammount (HTR value)
+        strlcpy(g_amount, symbol, MAX_TOKEN_SYMBOL_LEN + 1);
+        g_amount[symbol_len] = ' ';
+        format_value(output.value, g_amount + symbol_len + 1);
+    }
+
     return false;
 }
 
@@ -356,7 +405,11 @@ int ui_display_tx_outputs() {
     // skip changes, return ok if there is no more on buffer
     if (prepare_display_output()) return 0;
     g_validate_callback = &ui_confirm_output;  // show next until need more
-    ux_flow_init(0, ux_display_tx_output_flow, NULL);
+    if (g_is_authority) {
+        ux_flow_init(0, ux_display_tx_authority_output_flow, NULL);
+    } else {
+        ux_flow_init(0, ux_display_tx_output_flow, NULL);
+    }
 
     return 0;
 }
