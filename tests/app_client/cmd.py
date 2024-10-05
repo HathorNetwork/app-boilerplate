@@ -3,6 +3,7 @@ import time
 from typing import List, Tuple
 
 from app_client.cmd_builder import CommandBuilder, InsType
+from app_client.create_token_transaction import CreateTokenTransaction
 from app_client.exception import DeviceException
 from app_client.token import Token
 from app_client.transaction import ChangeInfo, Transaction
@@ -196,3 +197,11 @@ class Command:
 
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=InsType.INS_GET_ADDRESS)
+
+    def send_create_token_data(self, tx: CreateTokenTransaction):
+        sw, response = self.transport.exchange_apdu_raw(
+            self.builder.send_create_token_data(tx)
+        )
+
+        if sw != 0x9000:
+            raise DeviceException(error_code=sw, ins=InsType.INS_SEND_CREATE_TOKEN_DATA)
